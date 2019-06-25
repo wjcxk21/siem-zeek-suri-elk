@@ -20,5 +20,6 @@
 
 ## 使用说明
 处理本地离线pcap文件
+
     docker run -d -v "`pwd`:/pcap" -v "`pwd`/logs:/var/log/suricata" suricata:4.1.4 /usr/bin/suricata -c /etc/suricata/suricata.yaml -r yourfile.pcap
 
