@@ -22,4 +22,5 @@
 处理本地离线pcap文件
 
     docker run -d -v "`pwd`:/pcap" -v "`pwd`/logs:/var/log/suricata" suricata:4.1.4 /usr/bin/suricata -c /etc/suricata/suricata.yaml -r yourfile.pcap
-
+监听本地离线pcap文件夹
+    docker run -d -v "`pwd`:/pcap" -v "`pwd`/logs:/var/log/suricata" suricata:4.1.4 /usr/bin/suricata -c /etc/suricata/suricata.yaml -r /pcap --pcap-file-continuous

@@ -1,0 +1,125 @@
+FROM ubuntu:16.04
+
+ENV VERSION "4.1.4"
+
+ADD hyperscan-master /tmp/hyperscan
+
+ADD dist/ /root/dist/
+COPY suricata-${VERSION}.tar.gz /opt/suricata-${VERSION}.tar.gz
+
+## 更新软件源，安装语言环境，不然包含中文的配置文件可能引起问题
+RUN sed -i "/^deb /s|archive.ubuntu.com|mirrors.ustc.edu.cn|g" /etc/apt/sources.list && \
+    sed -i "/^deb /s|security.ubuntu.com|mirrors.ustc.edu.cn|g" /etc/apt/sources.list && \
+    apt-get update && apt-get install -y apt-utils locales && \
+    localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+ENV LANG en_US.utf8
+
+## 安装依赖项
+RUN apt-get -y install libpcre3 libpcre3-dbg libpcre3-dev \
+	build-essential libpcap-dev   \
+    libnet1-dev \
+	libyaml-0-2 libyaml-dev \
+	pkg-config \
+	zlib1g zlib1g-dev \
+    libcap-ng-dev libcap-ng0 \
+	make \
+	libmagic-dev \
+	libjansson-dev \
+    libnss3-dev \
+#	libgeoip-dev \
+	liblua5.1-dev \
+	libluajit-5.1-dev \
+#	libhiredis-dev \
+	libevent-dev \
+    python-yaml \
+	rustc cargo \
+	cmake ragel libboost-dev && \
+
+# 安装hyperscan
+    cd /tmp/hyperscan && \
+    mkdir build && \
+    cd build && \
+    cmake -DBUILD_STATIC_AND_SHARED=1 ../ && \
+    make && make install && \
+    echo "/usr/local/lib" | tee --append /etc/ld.so.conf.d/usrlocal.conf && \
+    ldconfig && \
+    rm -rf /tmp/* && \
+
+    cd /opt/ && \
+    mkdir -p /opt/builder/ && \
+    tar xzf suricata-${VERSION}.tar.gz --strip-components=1 -C /opt/builder/ && \
+    rm /opt/suricata-${VERSION}.tar.gz && \
+
+##编译安装
+	cd /opt/builder && \
+    ./configure --prefix=/usr \
+    --sysconfdir=/etc \
+    --mandir=/usr/share/man \
+    --localstatedir=/var \
+  #  --enable-non-bundled-htp \
+  #  --enable-nfqueue \
+    --enable-rust \
+    --disable-gccmarch-native \
+  #  --enable-hiredis \
+  #  --enable-geoip \
+    --enable-gccprotect \
+    --enable-pie \
+    --enable-luajit && \
+    make && \
+    make check && \
+    make install && \
+    make install-full && \
+    addgroup --gid 1000 suri && \
+    adduser --no-create-home --system -u 1000 --disabled-password --gid 1000 suri && \
+    chmod 644 /etc/suricata/*.config && \
+    cp /root/dist/* /etc/suricata/ && \
+    rm -f /etc/suricata/update.sh && \
+    mkdir -p /etc/suricata/rules && \
+    cp /opt/builder/rules/* /etc/suricata/rules/ && \
+    cp /root/dist/update.sh /usr/bin/ && \
+    chmod 755 /usr/bin/update.sh && \
+    update.sh OPEN && \
+	
+## 清理安装中间产物
+    apt-get -y  purge \
+	apt-utils cmake-data \
+	libpcre3-dbg libpcre3-dev \
+	build-essential \
+	libpcap-dev   \
+    libnet1-dev \
+	libyaml-dev \
+	pkg-config \
+	zlib1g-dev \
+    libcap-ng-dev  \
+	make \
+	libmagic-dev \
+	libjansson-dev  \
+    libnss3-dev \
+#	libgeoip-dev \
+	liblua5.1-dev \
+	libluajit-5.1-dev \
+#	libhiredis-dev \
+	libevent-dev \
+    python-yaml \
+	rustc cargo \
+	libboost-dev \
+	cmake ragel \
+	autotools-dev \
+	g++ g++-5 gcc gcc-5 gdb gdbserver \
+	binutils cpp cpp-5 \
+	python2.7 && \
+#    apt-get -y autoremove && \
+	apt-get clean && \
+    rm -rf /opt/builder && \
+    rm -rf /root/* && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /var/cache/apt/*
+
+# 
+STOPSIGNAL SIGINT
+WORKDIR /pcap    
+# CMD ["/usr/bin/suricata"]
+COPY --chown=1000:1000 docker-entrypoint.sh /
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
+

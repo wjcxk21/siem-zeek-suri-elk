@@ -1,0 +1,8 @@
+/pcaps/
+/hyperscan-master/
+*.zip
+/suricata-4.1.4/
+/node_modules/
+*.pcap
+*.cap
+*.tar.gz
